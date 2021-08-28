@@ -24,7 +24,7 @@ else
 	WRITESTR=$2
 fi
 
-MATCHSTR="The number of files are ${NUMFILES} and the number of matching lines are ${NUMFILES}"
+MATCHSTR="The number of files is ${NUMFILES} and the number of matching lines is ${NUMFILES}"
 
 echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
 
