@@ -94,6 +94,7 @@ make CROSS_COMPILE=${CROSS_COMPILE}
 cp finder.sh ${OUTDIR}/rootfs/home
 cp writer ${OUTDIR}/rootfs/home
 cp finder-test.sh ${OUTDIR}/rootfs/home
+cp autorun-qemu.sh ${OUTDIR}/rootfs/home
 cp -Lr conf ${OUTDIR}/rootfs/home
 
 sudo chown -R root:root ${OUTDIR}/rootfs
