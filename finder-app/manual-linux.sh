@@ -12,7 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 CROSS_COMPILE=aarch64-none-linux-gnu-
-ARCHMAKE="make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} HOSTCC=gcc-9"
+ARCHMAKE="make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}"
 SCRIPTDIR=$(pwd)
 
 if [ $# -lt 1 ]
@@ -89,15 +89,18 @@ sudo mknod -m 666 dev/console c 5 1
 
 cd "$SCRIPTDIR"
 make clean
-make
+make CROSS_COMPILE=${CROSS_COMPILE}
 
 cp finder.sh ${OUTDIR}/rootfs/home
 cp writer ${OUTDIR}/rootfs/home
 cp finder-test.sh ${OUTDIR}/rootfs/home
+cp -Lr conf ${OUTDIR}/rootfs/home
 
 sudo chown -R root:root ${OUTDIR}/rootfs
-cd "$OUTDIR"
+cd "$OUTDIR"/rootfs
 
 find . | cpio -H newc -ov --owner root:root > ${OUTDIR}/initramfs.cpio
+cd ..
 gzip -f initramfs.cpio
+ln -fs linux-stable/arch/arm64/boot/Image ./Image
 
