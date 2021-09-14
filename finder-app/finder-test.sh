@@ -66,6 +66,7 @@ do
 	$WRITER "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
+OUTPUTSTRING=$($FINDER "$WRITEDIR" "$WRITESTR")
 set +e
 echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
 if [ $? -eq 0 ]; then
