@@ -1,0 +1,1 @@
+The number of files is 10 and the number of matching lines is 10
