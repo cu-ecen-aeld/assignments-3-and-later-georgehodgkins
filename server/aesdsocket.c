@@ -120,7 +120,7 @@ int main (int argc, char** argv) {
 	of_memsz = (of_sz/PAGE_SIZE + 1)*PAGE_SIZE;
 	s = ftruncate(ofd, of_memsz);
 	if (s == -1) cleanup(SRC_FTRUNCATE);
-	void* of_mem = mmap(NULL, of_memsz, PROT_READ | PROT_WRITE, MAP_SHARED_VALIDATE, ofd, 0);
+	void* of_mem = mmap(NULL, of_memsz, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
 	if (of_mem == MAP_FAILED) cleanup(SRC_MMAP);
 	char* of_pt = (char*) of_mem + of_sz;
 
