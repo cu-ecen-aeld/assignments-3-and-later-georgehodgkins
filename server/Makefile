@@ -1,4 +1,5 @@
 CFLAGS=-O1 -g
+CC=$(CROSS_COMPILE)gcc
 
 all: aesdsocket
 

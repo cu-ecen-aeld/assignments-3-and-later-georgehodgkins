@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+	start)
+		start-stop-daemon -S --exec /usr/bin/aesdsocket -- -d
+		;;
+	stop)
+		start-stop-daemon -K --exec /usr/bin/aesdsocket --signal TERM
+		;;
+	*)
+		printf "Usage: %s {start|stop}" $0
+		exit 1
+esac
+
+exit 0
