@@ -8,7 +8,26 @@ set -u
 NUMFILES=10
 WRITESTR=AELD_IS_FUN
 WRITEDIR=/tmp/aeld-data
-username=$(cat conf/username.txt)
+username=$(cat /etc/finder-app/conf/username.txt)
+RESULTFILE=/tmp/assigmnent-4-result.txt
+
+WRITER=writer
+FINDER=finder.sh
+set +e 
+if [[ -e $WRITER ]]; then
+	WRITER=./$WRITER
+elif [[ -z $(command -v $WRITER) ]]; then
+   	printf "Can't find %s in current directory or PATH!\n" $WRITER
+	exit 1
+fi
+
+if [[ -e $FINDER ]]; then
+	FINDER=./$FINDER
+elif [[ -z $(command -v $FINDER) ]]; then
+   	printf "Can't find %s in current directory or PATH!\n" $FINDER
+	exit 1
+fi
+set -e
 
 if [ $# -lt 2 ]
 then
@@ -41,17 +60,18 @@ else
 	exit 1
 fi
 
+
 for i in $( seq 1 $NUMFILES)
 do
-	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
+	$WRITER "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
-OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
-
+OUTPUTSTRING=$($FINDER "$WRITEDIR" "$WRITESTR")
 set +e
 echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
 if [ $? -eq 0 ]; then
 	echo "success"
+	echo ${OUTPUTSTRING} > ${RESULTFILE}
 	exit 0
 else
 	echo "failed: expected  ${MATCHSTR} in ${OUTPUTSTRING} but instead found"
