@@ -135,7 +135,8 @@ int main (int argc, char** argv) {
 	struct sockaddr_in serv_addr = {
 		.sin_family = AF_INET,
 		.sin_port = htons(9000),
-		.sin_addr = htonl(INADDR_LOOPBACK)
+	//	.sin_addr = htonl(INADDR_LOOPBACK)
+		.sin_addr = htonl(INADDR_ANY)
 	};
 	s = bind(asock, &serv_addr, sizeof(struct sockaddr_in));
 	if (s == -1) cleanup(SRC_BIND);
