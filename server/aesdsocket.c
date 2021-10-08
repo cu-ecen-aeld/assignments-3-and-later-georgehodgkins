@@ -345,12 +345,13 @@ int main (int argc, char** argv) {
 	alarm(WRTIME_PERIOD);
 
 	// this thread handles all signals
+	/* only in glibc >= 2.32 though :(
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setsigmask_np(&attr, &fullmask);
 	s = pthread_setattr_default_np(&attr);
 	if (s != 0) cleanup(SRC_PTHATTR);
-	pthread_attr_destroy(&attr);
+	pthread_attr_destroy(&attr); */
 	
 	// main server loop (exited via interrupt)
 	while (1) {
@@ -370,7 +371,9 @@ int main (int argc, char** argv) {
 		thread_ll = newnode;
 		newnode->c.sock = csock;
 		newnode->c.addr = cli_addr.sin_addr;
+		pthread_sigmask(SIG_BLOCK, &fullmask, NULL); // this thread handles all signals
 		s = pthread_create(&newnode->tid, NULL, client_thread, &newnode->c);
+		pthread_sigmask(SIG_UNBLOCK, &fullmask, NULL);
 		if (s != 0) cleanup_errno(SRC_PTHCR, s);
 
 		// check for completed threads
