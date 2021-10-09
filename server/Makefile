@@ -1,7 +1,7 @@
 CFLAGS=-O0 -g
 CC=$(CROSS_COMPILE)gcc
 
-all: aesdsocket
+all: clean aesdsocket
 
 default: aesdsocket
 
