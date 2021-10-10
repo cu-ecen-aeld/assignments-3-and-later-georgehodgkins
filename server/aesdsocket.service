@@ -1,0 +1,9 @@
+[Unit]
+Description=aesdsocket
+
+[Service]
+ExecStart=/usr/bin/aesdsocket -d
+
+[Install]
+WantedBy=multi-user.target
+
