@@ -1,4 +1,5 @@
 CFLAGS=-O0 -g
+LDFLAGS=-pthread
 CC=$(CROSS_COMPILE)gcc
 
 all: aesdsocket
