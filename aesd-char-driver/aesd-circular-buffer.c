@@ -10,11 +10,20 @@
 
 #ifdef __KERNEL__
 #include <linux/string.h>
+#define assert(a)
 #else
 #include <string.h>
+#define assert(a) assert(a)
 #endif
 
 #include "aesd-circular-buffer.h"
+#include "assert.h"
+
+#define AESDCHAR_BUFSZ AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED
+#define INCWRAP(x) \
+	do { \
+		x = (x + 1) % AESDCHAR_BUFSZ; \
+	} while (0)
 
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
@@ -26,13 +35,27 @@
  * @return the struct aesd_buffer_entry structure representing the position described by char_offset, or
  * NULL if this position is not available in the buffer (not enough data is written).
  */
+#include <stdio.h>
 struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
 			size_t char_offset, size_t *entry_offset_byte_rtn )
 {
-    /**
-    * TODO: implement per description
-    */
-    return NULL;
+	if (buffer->in_offs == buffer->out_offs && !buffer->full) return NULL; // empty buffer
+
+	size_t s_offs = 0; 
+	uint8_t i = buffer->out_offs;
+	do { // loop guard is false initially if buffer is full
+		assert(buffer->entry[i].buffptr);
+		size_t new_s = s_offs + buffer->entry[i].size;
+		if (new_s > char_offset) break;
+		else s_offs = new_s;
+		INCWRAP(i);
+	} while (i != buffer->in_offs);
+
+	// second condition catches case where first entry contains offset (and so s_offs is 0)
+	if (i == buffer->in_offs && s_offs) return NULL; // not found
+
+	*entry_offset_byte_rtn = char_offset - s_offs;
+	return &buffer->entry[i];
 }
 
 /**
@@ -44,9 +67,15 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 */
 void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
-    /**
-    * TODO: implement per description 
-    */
+	assert(add_entry->buffptr);
+	if (buffer->full) {
+		assert(buffer->in_offs == buffer->out_offs);
+		INCWRAP(buffer->out_offs);
+	}
+	
+	buffer->entry[buffer->in_offs] = *add_entry;
+	INCWRAP(buffer->in_offs);
+	buffer->full = (buffer->in_offs == buffer->out_offs);
 }
 
 /**
