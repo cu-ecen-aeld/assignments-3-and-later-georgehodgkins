@@ -1,4 +1,4 @@
-CFLAGS=-O1 -g
+CFLAGS=-O0 -g
 CC=$(CROSS_COMPILE)gcc
 
 all: aesdsocket
@@ -6,7 +6,7 @@ all: aesdsocket
 default: aesdsocket
 
 aesdsocket: aesdsocket.c
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -pthread
 
 clean:
 	rm -f aesdsocket
