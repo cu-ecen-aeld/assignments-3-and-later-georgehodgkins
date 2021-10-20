@@ -10,14 +10,13 @@
 
 #ifdef __KERNEL__
 #include <linux/string.h>
-#define assert(a)
+#define free(x) kfree(x)
 #else
 #include <string.h>
-#define assert(a) assert(a)
 #endif
 
 #include "aesd-circular-buffer.h"
-#include "assert.h"
+
 
 #define AESDCHAR_BUFSZ AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED
 #define INCWRAP(x) \
@@ -65,17 +64,20 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+char* aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
 	assert(add_entry->buffptr);
+	char* rem = NULL;
 	if (buffer->full) {
 		assert(buffer->in_offs == buffer->out_offs);
+		rem = buffer->entry[buffer->out_offs].buffptr;
 		INCWRAP(buffer->out_offs);
 	}
 	
 	buffer->entry[buffer->in_offs] = *add_entry;
 	INCWRAP(buffer->in_offs);
 	buffer->full = (buffer->in_offs == buffer->out_offs);
+	return rem;
 }
 
 /**
@@ -85,3 +87,18 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
 {
     memset(buffer,0,sizeof(struct aesd_circular_buffer));
 }
+
+/*
+ * Empties @param buffer, freeing all strings it contains.
+ */
+void aesd_circular_buffer_free(struct aesd_circular_buffer *buffer) {
+	if (buffer->out_offs == buffer->in_offs && !full) return;
+
+	do {
+		free(buffer->entry[buffer->out_offs].buffptr);
+		buffer->entry[buffer->out_offs] = {0};
+		INCWRAP(buffer->out_offs);
+	} while(buffer->out_offs != buffer->in_offs);
+}
+
+

@@ -25,9 +25,10 @@
 
 struct aesd_dev
 {
-	/**
-	 * TODO: Add structure(s) and locks needed to complete assignment requirements
-	 */
+	struct aesd_circular_buffer buf; // buffer holding entries
+	char* ccom; // command buffer
+	size_t cpos; // command buffer position
+	size_t csz; // command buffer alloc'd size
 	struct cdev cdev;	  /* Char device structure		*/
 };
 
