@@ -23,6 +23,8 @@
 #  define PDEBUG(fmt, args...) /* not debugging: nothing */
 #endif
 
+#include "aesd-circular-buffer.h"
+
 struct aesd_dev
 {
 	struct aesd_circular_buffer buf; // buffer holding entries
