@@ -10,9 +10,14 @@
 
 #ifdef __KERNEL__
 #include <linux/string.h>
+#include <linux/slab.h>
+#include <asm/bug.h>
 #define free(x) kfree(x)
 #else
 #include <string.h>
+#include <stdlib.h>
+#include <assert.h>
+#define WARN_ON(a) assert(a)
 #endif
 
 #include "aesd-circular-buffer.h"
@@ -42,7 +47,6 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 	size_t s_offs = 0; 
 	uint8_t i = buffer->out_offs;
 	do { // loop guard is false initially if buffer is full
-		assert(buffer->entry[i].buffptr);
 		size_t new_s = s_offs + buffer->entry[i].size;
 		if (new_s > char_offset) break;
 		else s_offs = new_s;
@@ -63,12 +67,13 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-char* aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+const char* aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer,
+		const struct aesd_buffer_entry *add_entry)
 {
-	assert(add_entry->buffptr);
-	char* rem = NULL;
+	WARN_ON(add_entry->buffptr && "aesdbuf: null entry input");
+	const char* rem = NULL;
 	if (buffer->full) {
-		assert(buffer->in_offs == buffer->out_offs);
+		WARN_ON(buffer->in_offs == buffer->out_offs && "aesdbuf: full flag set incorrectly");
 		rem = buffer->entry[buffer->out_offs].buffptr;
 		INCWRAP(buffer->out_offs);
 	}

@@ -17,16 +17,12 @@
 #include <linux/types.h>
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
+#include <asm/bug.h>
 #include "aesdchar.h"
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
 #define COMBUF_INITCAP 1024
-
-#ifndef __KERNEL__
-#include <assert.h>
-#define KASSERT(a, m) assert(a && m)
-#endif
 
 MODULE_AUTHOR("George Hodgkins");
 MODULE_LICENSE("Dual BSD/GPL");
@@ -61,7 +57,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 			size_t copy = ent->size - ent_off;
 			if (copy > count) copy = count;
 			size_t bad = __copy_to_user(bufpos, &ent->buffptr[ent_off], copy);
-			KASSERT(bad == 0, "aesdchar: some bytes could not be copied to user command");
+			WARN_ON(bad == 0 && "aesdchar: some bytes could not be copied to user command");
 			bufpos += copy;
 			rd_off += copy;
 			rd_count += copy;
@@ -78,19 +74,19 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
 	if (!the_dev.ccom) {
 		the_dev.ccom = kmalloc(count+1, GFP_KERNEL);
-		KASSERT(the_dev.ccom != 0, "aesdchar: allocating command buffer failed");
+		WARN_ON(the_dev.ccom != 0 && "aesdchar: allocating command buffer failed");
 		the_dev.csz = ksize(the_dev.ccom);
 		the_dev.cpos = 0;
 		the_dev.ccom[count] = 0;
 	} else if (the_dev.csz < the_dev.cpos + count) {
 		char* ncom = krealloc(the_dev.ccom, the_dev.cpos + count + 1, GFP_KERNEL);
-		KASSERT(ncom != NULL, "aesdchar: expanding command buffer failed");
+		WARN_ON(ncom != NULL && "aesdchar: expanding command buffer failed");
 		the_dev.ccom = ncom;
 		the_dev.csz = ksize(the_dev.ccom);
 		the_dev.ccom[the_dev.cpos+count] = 0;
 	}
 	size_t bad = __copy_from_user(&the_dev.ccom[the_dev.cpos], buf, count);
-	KASSERT(bad == 0, "aesdchar: some bytes could not be copied from user command");
+	WARN_ON(bad == 0 && "aesdchar: some bytes could not be copied from user command");
 	retval = count - bad;
 	char* delim = strchr(&the_dev.ccom[the_dev.cpos], '\n');
 
@@ -98,7 +94,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		struct aesd_buffer_entry ent = {
 			.buffptr = the_dev.ccom;
 			.size = the_dev.cpos + count + 1;
-		}
+		};
 		// add new entry, freeing oldest entry if buffer is full
 		kfree(aesd_circular_buffer_add_entry(&the_dev.buf, &ent));
 		the_dev.ccom = NULL;
@@ -164,7 +160,7 @@ void aesd_cleanup_module(void)
 
 	unregister_chrdev_region(devno, 1);
 
-	aesd_circular_buffer_free(&the_dev.buf)
+	aesd_circular_buffer_free(&the_dev.buf);
 	kfree(the_dev.ccom);
 }
 
