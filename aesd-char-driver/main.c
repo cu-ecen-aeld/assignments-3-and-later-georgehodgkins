@@ -98,8 +98,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
 	if (delim) { // give entry to buffer
 		struct aesd_buffer_entry ent = {
-			.buffptr = the_dev.ccom;
-			.size = the_dev.cpos + count + 1;
+			.buffptr = the_dev.ccom,
+			.size = the_dev.cpos + count + 1
 		};
 		// add new entry, freeing oldest entry if buffer is full
 		kfree(aesd_circular_buffer_add_entry(&the_dev.buf, &ent));
@@ -149,7 +149,7 @@ int aesd_init_module(void)
 		return result;
 	}
 	memset(&the_dev,0,sizeof(struct aesd_dev));
-	init_MUTEX(&the_dev.sem);
+	sema_init(&the_dev.sem, 1);
 
 	result = aesd_setup_cdev(&the_dev);
 
