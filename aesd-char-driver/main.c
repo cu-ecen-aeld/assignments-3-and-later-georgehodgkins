@@ -19,7 +19,6 @@
 #include <linux/fs.h> // file_operations
 #include <linux/slab.h>
 #include <asm/bug.h>
-#include <asm/semaphore.h>
 #include "aesdchar.h"
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;

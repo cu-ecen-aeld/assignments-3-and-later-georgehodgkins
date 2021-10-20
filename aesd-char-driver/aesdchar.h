@@ -24,7 +24,7 @@
 #endif
 
 #include "aesd-circular-buffer.h"
-#include <asm/semaphore.h>
+#include <linux/semaphore.h>
 
 struct aesd_dev
 {
