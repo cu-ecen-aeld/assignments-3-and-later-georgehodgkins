@@ -11,6 +11,7 @@
 #ifdef __KERNEL__
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/uaccess.h>
 #include <asm/bug.h>
 #define free(x) kfree(x)
 #else
@@ -96,11 +97,11 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
  * Empties @param buffer, freeing all strings it contains.
  */
 void aesd_circular_buffer_free(struct aesd_circular_buffer *buffer) {
-	if (buffer->out_offs == buffer->in_offs && !full) return;
+	if (buffer->out_offs == buffer->in_offs && !buffer->full) return;
 
 	do {
 		free(buffer->entry[buffer->out_offs].buffptr);
-		buffer->entry[buffer->out_offs] = {0};
+		buffer->entry[buffer->out_offs].buffptr = NULL;
 		INCWRAP(buffer->out_offs);
 	} while(buffer->out_offs != buffer->in_offs);
 }

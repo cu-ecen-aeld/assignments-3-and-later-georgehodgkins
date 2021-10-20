@@ -24,6 +24,7 @@
 #endif
 
 #include "aesd-circular-buffer.h"
+#include <asm/semaphore.h>
 
 struct aesd_dev
 {
@@ -31,6 +32,7 @@ struct aesd_dev
 	char* ccom; // command buffer
 	size_t cpos; // command buffer position
 	size_t csz; // command buffer alloc'd size
+	struct semaphore sem; // device lock
 	struct cdev cdev;	  /* Char device structure		*/
 };
 
