@@ -51,7 +51,7 @@ size_t of_sz = 0;
 void* of_mem = NULL; // output file mapping
 size_t of_memsz = 0; // size of output file mapping
 char* of_pt = NULL; // output cursor
-#endif;
+#endif
 pthread_mutex_t of_lk = PTHREAD_MUTEX_INITIALIZER; // output file lock
 pthread_mutex_t ntoa_lk = PTHREAD_MUTEX_INITIALIZER; // lock for inet_ntoa (uses a static buffer)
 struct node* thread_ll = NULL; // linked list of active threads
@@ -63,7 +63,7 @@ typedef enum {SRC_SOCKET, SRC_LISTEN, SRC_INT = SIGINT, // this has to be locate
 	SRC_BIND, SRC_OPEN, SRC_MMAP, SRC_MREMAP, SRC_ACCEPT, SRC_SIGACTION,
 	SRC_MALLOC, SRC_REALLOC, SRC_FSTAT, SRC_CLOSE, SRC_READ, SRC_WRITE,
 	SRC_TERM = SIGTERM, SRC_FTRUNCATE, SRC_EINVAL, SRC_DUP,
-	SRC_PTHCR, SRC_PTHJN, SRC_STRFTIME, SRC_PTHATTR} cleanup_src;
+	SRC_PTHCR, SRC_PTHJN, SRC_STRFTIME, SRC_PTHATTR, SRC_C_WRITE} cleanup_src;
 
 // error message table
 const char* errs[] = {
@@ -89,7 +89,8 @@ const char* errs[] = {
 	[SRC_PTHCR] = "error creating client thread",
 	[SRC_PTHJN] = "error joining client thread",
 	[SRC_STRFTIME] = "error formatting time",
-	[SRC_PTHATTR] = "error setting thread attributes"
+	[SRC_PTHATTR] = "error setting thread attributes",
+	[SRC_C_WRITE] = "error writing to circular buffer"
 };
 
 // main cleanup handler
@@ -222,7 +223,7 @@ static void* client_thread (void* param_v) {
 	off64_t sploff = 0;
 	wrsz = of_sz;
 	do {
-		wrc = splice(ofd, &sploff, csock, wrsz, NULL, 0);
+		wrc = splice(ofd, &sploff, param->sock, NULL, wrsz, 0);
 		wrsz -= wrc;
 	} while (wrsz > 0 && wrc != -1);
 	if (wrc == -1) cleanup_thr(SRC_WRITE);
