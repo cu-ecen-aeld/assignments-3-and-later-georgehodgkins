@@ -71,7 +71,7 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 const char* aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer,
 		const struct aesd_buffer_entry *add_entry)
 {
-	WARN_ON(entry->buffptr == NULL);
+	WARN_ON(add_entry->buffptr == NULL);
 	const char* rem = NULL;
 	if (buffer->full) {
 		WARN_ON(buffer->in_offs != buffer->out_offs);
