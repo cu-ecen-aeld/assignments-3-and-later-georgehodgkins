@@ -32,9 +32,15 @@ struct node {
 // -----constants-----
 #define INITIAL_MAX_PACKET 1024
 #define MAX_BACKLOG 8
+
+#ifdef USE_AESD_CHAR_DEVICE
+const char* outpath = "/dev/aesdchar";
+#else
 const char* outpath = "/var/tmp/aesdsocketdata";
 #define MAX_TIMELEN 48
 #define WRTIME_PERIOD 10
+static char timestr[MAX_TIMELEN]; // static buffer for time string
+#endif
 
 // -----globals-----
 long PAGE_SIZE; // \_/()\_/
@@ -45,7 +51,6 @@ size_t of_memsz = 0; // size of output file mapping
 char* of_pt = NULL; // output cursor
 size_t of_sz = 0;
 pthread_mutex_t of_lk = PTHREAD_MUTEX_INITIALIZER; // output file lock
-static char timestr[MAX_TIMELEN]; // static buffer for time string
 pthread_mutex_t ntoa_lk = PTHREAD_MUTEX_INITIALIZER; // lock for inet_ntoa (uses a static buffer)
 struct node* thread_ll = NULL; // linked list of active threads
 
@@ -233,6 +238,7 @@ static void* client_thread (void* param_v) {
 	return NULL;
 }
 
+#ifndef USE_AESD_CHAR_DEVICE
 // periodic time logger (SIGALRM handler)
 static void wrtime (int sig) {
 	assert(sig == SIGALRM);
@@ -256,6 +262,7 @@ static void wrtime (int sig) {
 	pthread_mutex_unlock(&of_lk);
 	alarm(WRTIME_PERIOD);
 }
+#endif // USE_AESD_CHAR_DEVICE
 
 int main (int argc, char** argv) {
 	// open syslog
@@ -336,6 +343,7 @@ int main (int argc, char** argv) {
 	s = listen(asock, MAX_BACKLOG);
 	if (s == -1) cleanup(SRC_LISTEN);
 
+#ifndef USE_AESD_CHAR_DEVICE
 	// install alarm handler and start alarm (must be after fork)
 	act.sa_sigaction = NULL; // in case it's a union
 	act.sa_handler = wrtime;
@@ -343,6 +351,7 @@ int main (int argc, char** argv) {
 	s = sigaction(SIGALRM, &act, NULL);
 	if (s == -1) cleanup(SRC_SIGACTION);
 	alarm(WRTIME_PERIOD);
+#endif
 
 	// this thread handles all signals
 	/* only in glibc >= 2.32 though :(
