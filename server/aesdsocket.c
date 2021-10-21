@@ -65,7 +65,7 @@ typedef enum {SRC_SOCKET, SRC_LISTEN, SRC_INT = SIGINT, // this has to be locate
 	SRC_BIND, SRC_OPEN, SRC_MMAP, SRC_MREMAP, SRC_ACCEPT, SRC_SIGACTION,
 	SRC_MALLOC, SRC_REALLOC, SRC_FSTAT, SRC_CLOSE, SRC_READ, SRC_WRITE,
 	SRC_TERM = SIGTERM, SRC_FTRUNCATE, SRC_EINVAL, SRC_DUP,
-	SRC_PTHCR, SRC_PTHJN, SRC_STRFTIME, SRC_PTHATTR, SRC_C_WRITE} cleanup_src;
+	SRC_PTHCR, SRC_PTHJN, SRC_STRFTIME, SRC_PTHATTR, SRC_C_WRITE, SRC_C_READ} cleanup_src;
 
 // error message table
 const char* errs[] = {
@@ -92,7 +92,8 @@ const char* errs[] = {
 	[SRC_PTHJN] = "error joining client thread",
 	[SRC_STRFTIME] = "error formatting time",
 	[SRC_PTHATTR] = "error setting thread attributes",
-	[SRC_C_WRITE] = "error writing to circular buffer"
+	[SRC_C_WRITE] = "error writing to circular buffer",
+	[SRC_C_READ] = "error reading from circular buffer"
 };
 
 // main cleanup handler
