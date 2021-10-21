@@ -92,7 +92,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
 	
 	if (!the_dev.ccom) {
-		the_dev.ccom = kmalloc(count+1, GFP_KERNEL);
+		the_dev.ccom = kmalloc(count, GFP_KERNEL);
 		if (!the_dev.ccom) {
 			printk(KERN_ERR "aesdchar: error allocating new command buffer");
 			goto out;
@@ -101,25 +101,25 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		the_dev.cpos = 0;
 		the_dev.ccom[count] = 0;
 	} else if (the_dev.csz < the_dev.cpos + count) {
-		char* ncom = krealloc(the_dev.ccom, the_dev.cpos + count + 1, GFP_KERNEL);
+		char* ncom = krealloc(the_dev.ccom, the_dev.cpos + count, GFP_KERNEL);
 		if (!ncom) {
 			printk(KERN_ERR "aesdchar: error expanding command buffer");
 			goto out;
 		}
 		the_dev.ccom = ncom;
 		the_dev.csz = ksize(the_dev.ccom);
-		the_dev.ccom[the_dev.cpos+count] = 0;
 	}
 	size_t bad = __copy_from_user(&the_dev.ccom[the_dev.cpos], buf, count);
 	if (bad)
 		printk(KERN_ERR "aesdchar: %zu of %zu bytes not copied from user!", bad, count);
 	retval = count - bad;
-	char* delim = strchr(&the_dev.ccom[the_dev.cpos], '\n');
+	char* delim = memchr(&the_dev.ccom[the_dev.cpos], '\n', count);
+	the_dev.cpos += count;
 
 	if (delim) { // give entry to buffer
 		struct aesd_buffer_entry ent = {
 			.buffptr = the_dev.ccom,
-			.size = the_dev.cpos + count + 1
+			.size = the_dev.cpos
 		};
 		PDEBUG("Found delimiter, giving buffer %p with length %zu to queue", ent.buffptr, ent.size);
 		// add new entry, freeing oldest entry if buffer is full
@@ -133,7 +133,6 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		the_dev.cpos = 0;
 	} else { // keep appending
 		PDEBUG("no delimiter in this write");
-		the_dev.cpos += count;
 	}
 
 out:
