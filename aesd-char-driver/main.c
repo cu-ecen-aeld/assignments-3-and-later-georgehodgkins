@@ -118,10 +118,9 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	the_dev.cpos += count;
 
 	if (delim) { // give entry to buffer
-		*delim = 0;
 		struct aesd_buffer_entry ent = {
 			.buffptr = the_dev.ccom,
-			.size = the_dev.cpos-1
+			.size = the_dev.cpos
 		};
 		PDEBUG("Found delimiter, giving buffer %p with length %zu to queue", ent.buffptr, ent.size);
 		// add new entry, freeing oldest entry if buffer is full
