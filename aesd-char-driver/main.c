@@ -61,7 +61,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 			size_t copy = ent->size - ent_off;
 			if (copy > count) copy = count;
 			size_t bad = __copy_to_user(bufpos, &ent->buffptr[ent_off], copy);
-			WARN_ON(bad == 0 && "aesdchar: some bytes could not be copied to user command");
+			if (bad)
+				kprintf(KERN_ERR "aesdchar: %zu of %zu bytes not copied to user!", bad, copy);
 			bufpos += copy;
 			rd_off += copy;
 			rd_count += copy;
