@@ -31,10 +31,14 @@ MODULE_AUTHOR("George Hodgkins");
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev the_dev;
+struct file_operations aesd_fops;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
 	PDEBUG("open");
+	if (filp->f_ops != &aesd_fops) {
+	   PDEBUG("aesdchar: f_ops seems wrong: is %p, should be %p", filp->f_ops, &aesd_fops);	
+	}
 	return 0;
 }
 
