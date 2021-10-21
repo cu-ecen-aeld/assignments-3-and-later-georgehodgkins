@@ -50,7 +50,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	if (!access_ok(buf, count)) return -EFAULT;
 	LOCK_DEV(the_dev);
 	PDEBUG("request %zu bytes with offset %lld",count,*f_pos);
-	struct aesd_buffer_entry *ent;
+	struct aesd_buffer_entry *ent, *first_ent = NULL;
 	size_t ent_off = 0;
 	size_t rd_off = *f_pos;
 	ssize_t rd_count = 0;
@@ -58,7 +58,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	do {
 		PDEBUG("looking for %zu more bytes starting at offset %zu", count-rd_count, rd_off);
 		ent = aesd_circular_buffer_find_entry_offset_for_fpos(&the_dev.buf, rd_off, &ent_off);
-	   	if (ent) {
+	   	if (ent && (!first_ent || ent != first_ent)) {
+			if (!first_ent) first_ent = ent;
 			size_t copy = ent->size - ent_off;
 			if (copy > count) copy = count;
 			PDEBUG("found %zu bytes in buffer %p starting at offset %zu", copy, ent->buffptr, ent_off);
@@ -71,7 +72,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 		}
 	} while (ent && rd_count < count);
 	if (rd_count < count)
-		printk(KERN_ERR "aesdchar: did not find enough bytes: found %zu of %zu", rd_count, count);
+		PDEBUG("did not find all requested bytes: found %zu of %zu", rd_count, count);
 	up(&the_dev.sem);
 	return rd_count;
 }
