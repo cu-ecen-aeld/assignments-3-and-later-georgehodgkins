@@ -56,6 +56,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	ssize_t rd_count = 0;
 	char __user *bufpos = buf;
 	do {
+		PDEBUG("looking for %zu more bytes starting at offset %zu", count-rd_count, rd_off);
 		ent = aesd_circular_buffer_find_entry_offset_for_fpos(&the_dev.buf, rd_off, &ent_off);
 	   	if (ent) {
 			size_t copy = ent->size - ent_off;
