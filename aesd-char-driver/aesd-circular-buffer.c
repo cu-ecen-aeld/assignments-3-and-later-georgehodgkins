@@ -18,7 +18,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#define WARN_ON(a) assert(a)
+#define WARN_ON(a) assert(!(a))
 #endif
 
 #include "aesd-circular-buffer.h"
@@ -71,10 +71,10 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 const char* aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer,
 		const struct aesd_buffer_entry *add_entry)
 {
-	WARN_ON(add_entry->buffptr && "aesdbuf: null entry input");
+	WARN_ON(entry->buffptr == NULL);
 	const char* rem = NULL;
 	if (buffer->full) {
-		WARN_ON(buffer->in_offs == buffer->out_offs && "aesdbuf: full flag set incorrectly");
+		WARN_ON(buffer->in_offs != buffer->out_offs);
 		rem = buffer->entry[buffer->out_offs].buffptr;
 		INCWRAP(buffer->out_offs);
 	}
