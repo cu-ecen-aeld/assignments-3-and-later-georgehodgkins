@@ -77,6 +77,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	} while (ent && rd_count < count);
 	if (rd_count < count)
 		PDEBUG("did not find all requested bytes: found %zu of %zu", rd_count, count);
+	*f_pos = rd_off;
 	PDEBUG("Returned buffer contents:");
 	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 1, buf, rd_count, true);
 	up(&the_dev.sem);
