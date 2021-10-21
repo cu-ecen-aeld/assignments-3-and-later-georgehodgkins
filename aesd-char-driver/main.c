@@ -67,7 +67,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 			size_t copy = ent->size - ent_off;
 			if (copy > count) copy = count;
 			PDEBUG("found %zu bytes in buffer %p starting at offset %zu", copy, ent->buffptr, ent_off);
-			print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 8, 1, &ent->buffptr[ent_off], copy, true);
 			size_t bad = __copy_to_user(bufpos, &ent->buffptr[ent_off], copy);
 			if (bad)
 				printk(KERN_ERR "aesdchar: %zu of %zu bytes not copied to user!", bad, copy);
@@ -78,6 +77,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	} while (ent && rd_count < count);
 	if (rd_count < count)
 		PDEBUG("did not find all requested bytes: found %zu of %zu", rd_count, count);
+	PDEBUG("Returned buffer contents:");
+	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 1, buf, rd_count, true);
 	up(&the_dev.sem);
 	return rd_count;
 }
