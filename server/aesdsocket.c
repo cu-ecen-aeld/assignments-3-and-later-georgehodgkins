@@ -51,6 +51,8 @@ size_t of_sz = 0;
 void* of_mem = NULL; // output file mapping
 size_t of_memsz = 0; // size of output file mapping
 char* of_pt = NULL; // output cursor
+#else
+#define MAX_ALLOCA_BUF ((PTHREAD_STACK_MIN >> 2)*3) 
 #endif
 pthread_mutex_t of_lk = PTHREAD_MUTEX_INITIALIZER; // output file lock
 pthread_mutex_t ntoa_lk = PTHREAD_MUTEX_INITIALIZER; // lock for inet_ntoa (uses a static buffer)
@@ -209,25 +211,41 @@ static void* client_thread (void* param_v) {
 	// write packet to buffer
 	pthread_mutex_lock(&of_lk);
 	size_t wrsz = packet_sz;
-	char* packpt = packet;
+	char* wrpt = packet;
 	ssize_t wrc;
 	do {
-		wrc = write(ofd, packpt, wrsz);
+		wrc = write(ofd, wrpt, wrsz);
 		wrsz -= wrc;
-		packpt += wrc;
+		wrpt += wrc;
 	} while (wrsz > 0 && wrc != -1);
 	if (wrc == -1) cleanup_thr(SRC_C_WRITE);
 	of_sz += packet_sz;
 
+	// get buffer contents in userspace
+	char* of_buf = malloc(of_sz);
+	pthread_cleanup_push(free, of_buf);
+	ssize_t rdc;
+	size_t rdsz = of_sz;
+	char* rdpt = of_buf;
+	do {
+		rdc = read(ofd, rdpt, rdsz);
+		rdsz -= rdc;
+		rdpt += rdc;
+	} while (rdc != -1 && rdsz > 0);
+	if (rdc == -1) cleanup_thr(SRC_C_READ);
+		
 	// send buffer contents to client
 	off64_t sploff = 0;
 	wrsz = of_sz;
+	wrpt = of_buf;
 	do {
-		wrc = splice(ofd, &sploff, param->sock, NULL, wrsz, 0);
+		wrc = write(param->sock, wrpt, wrsz);
 		wrsz -= wrc;
+		wrpt += wrc;
 	} while (wrsz > 0 && wrc != -1);
 	if (wrc == -1) cleanup_thr(SRC_WRITE);
 	pthread_mutex_unlock(&of_lk);
+	pthread_cleanup_pop(1); // frees of_buf
 #else 
 	// write packet
 	pthread_mutex_lock(&of_lk);
@@ -259,8 +277,7 @@ static void* client_thread (void* param_v) {
 #endif
 
 	// close & cleanup connection
-	pthread_cleanup_pop(0);
-	free(packet);
+	pthread_cleanup_pop(1); // frees packet buffer
 	pthread_cleanup_pop(0);
 	s = close(param->sock);
 	if (s == -1) cleanup(SRC_CLOSE);
