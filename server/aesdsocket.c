@@ -46,10 +46,12 @@ static char timestr[MAX_TIMELEN]; // static buffer for time string
 long PAGE_SIZE; // \_/()\_/
 int asock = -1; // accepting socket
 int ofd = -1; // output file descriptor
+size_t of_sz = 0;
+#ifndef USE_AESD_CHAR_DEVICE
 void* of_mem = NULL; // output file mapping
 size_t of_memsz = 0; // size of output file mapping
 char* of_pt = NULL; // output cursor
-size_t of_sz = 0;
+#endif;
 pthread_mutex_t of_lk = PTHREAD_MUTEX_INITIALIZER; // output file lock
 pthread_mutex_t ntoa_lk = PTHREAD_MUTEX_INITIALIZER; // lock for inet_ntoa (uses a static buffer)
 struct node* thread_ll = NULL; // linked list of active threads
@@ -117,9 +119,11 @@ static void cleanup_errno (cleanup_src src, int e) {
 	   	free(n);
 	}	
 	if (asock != -1) close(asock);
-	if (of_mem) munmap(of_mem, of_memsz);
 	if (ofd != -1) close (ofd);
+#ifndef USE_AESD_CHAR_DEVICE
+	if (of_mem) munmap(of_mem, of_memsz);
 	unlink(outpath);
+#endif
 
 	exit(xstat);
 }
@@ -200,6 +204,30 @@ static void* client_thread (void* param_v) {
 		max_read -= read_sz;
 	}
 
+#ifdef USE_AESD_CHAR_DEVICE
+	// write packet to buffer
+	pthread_mutex_lock(&of_lk);
+	size_t wrsz = packet_sz;
+	char* packpt = packet;
+	ssize_t wrc;
+	do {
+		wrc = write(ofd, packpt, wrsz);
+		wrsz -= wrc;
+		packpt += wrc;
+	} while (wrsz > 0 && wrc != -1);
+	if (wrc == -1) cleanup_thr(SRC_C_WRITE);
+	of_sz += packet_sz;
+
+	// send buffer contents to client
+	off64_t sploff = 0;
+	wrsz = of_sz;
+	do {
+		wrc = splice(ofd, &sploff, csock, wrsz, NULL, 0);
+		wrsz -= wrc;
+	} while (wrsz > 0 && wrc != -1);
+	if (wrc == -1) cleanup_thr(SRC_WRITE);
+	pthread_mutex_unlock(&of_lk);
+#else 
 	// write packet
 	pthread_mutex_lock(&of_lk);
 	if (of_sz + packet_sz > of_memsz) { // need to expand mapping
@@ -227,6 +255,7 @@ static void* client_thread (void* param_v) {
 		wsz = write(param->sock, of_mem, write_sz);
 	} while (wsz != -1 && write_sz > wsz);
 	if (wsz == -1) cleanup_thr(SRC_WRITE);
+#endif
 
 	// close & cleanup connection
 	pthread_cleanup_pop(0);
@@ -289,6 +318,10 @@ int main (int argc, char** argv) {
 	s = sigaction(SIGTERM, &act, NULL);
 	if (s == -1) cleanup(SRC_SIGACTION);
 
+#ifdef USE_AESD_CHAR_DEVICE
+	ofd = open(outpath, O_RDWR, 0644);
+	if (ofd == -1) cleanup(SRC_OPEN);
+#else
 	// open+mmap output file
 	PAGE_SIZE = sysconf(_SC_PAGESIZE);
 	ofd = open(outpath, O_RDWR | O_CREAT | O_APPEND, 0644);
@@ -302,6 +335,7 @@ int main (int argc, char** argv) {
 	of_mem = mmap(NULL, of_memsz, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
 	if (of_mem == MAP_FAILED) cleanup(SRC_MMAP);
 	of_pt = (char*) of_mem + of_sz;
+#endif
 
 	// create socket
 	asock = socket(AF_INET, SOCK_STREAM, 0);
