@@ -221,6 +221,8 @@ static void* client_thread (void* param_v) {
 	} while (wrsz > 0 && wrc != -1);
 	if (wrc == -1) cleanup_thr(SRC_C_WRITE);
 	of_sz += packet_sz;
+	syslog(LOG_INFO, "Got packet of length %zu from client, new file length %zu", packet_sz, of_sz);
+	
 
 	// get buffer contents in userspace
 	char* of_buf = malloc(of_sz);
@@ -246,6 +248,7 @@ static void* client_thread (void* param_v) {
 	} while (wrsz > 0 && wrc != -1);
 	if (wrc == -1) cleanup_thr(SRC_WRITE);
 	pthread_mutex_unlock(&of_lk);
+	syslog(LOG_INFO, "Sent full file back to client, length %zu", of_sz);
 	pthread_cleanup_pop(1); // frees of_buf
 #else 
 	// write packet
