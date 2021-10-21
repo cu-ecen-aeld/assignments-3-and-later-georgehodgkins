@@ -13,4 +13,4 @@ aesdsocket-chrdev: aesdsocket.c
 	$(CC) $(CFLAGS) -DUSE_AESD_CHAR_DEVICE -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f aesdsocket*
+	rm -f aesdsocket aesdsocket-chrdev
