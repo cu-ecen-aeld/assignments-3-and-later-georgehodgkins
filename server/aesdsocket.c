@@ -343,10 +343,7 @@ int main (int argc, char** argv) {
 	s = sigaction(SIGTERM, &act, NULL);
 	if (s == -1) cleanup(SRC_SIGACTION);
 
-#ifdef USE_AESD_CHAR_DEVICE
-	ofd = open(outpath, O_RDWR, 0644);
-	if (ofd == -1) cleanup(SRC_OPEN);
-#else
+#ifndef USE_AESD_CHAR_DEVICE
 	// open+mmap output file
 	PAGE_SIZE = sysconf(_SC_PAGESIZE);
 	ofd = open(outpath, O_RDWR | O_CREAT | O_APPEND, 0644);
@@ -432,6 +429,11 @@ int main (int argc, char** argv) {
 		} while (csock == -1 && errno == EINTR);
 		if (csock == -1) cleanup(SRC_ACCEPT);
 		assert(addrlen <= sizeof(struct sockaddr_in));
+
+		if (ofd == -1) {
+			ofd = open(outpath, O_RDWR);
+			if (ofd == -1) cleanup(SRC_OPEN);
+		}
 
 		// give connection to thread
 		struct node* newnode = malloc(sizeof(struct node));		
