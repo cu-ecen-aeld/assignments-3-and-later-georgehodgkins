@@ -223,19 +223,22 @@ static void* client_thread (void* param_v) {
 	of_sz += packet_sz;
 	syslog(LOG_INFO, "Got packet of length %zu from client, new file length %zu", packet_sz, of_sz);
 	
-
 	// get buffer contents in userspace
 	char* of_buf = malloc(of_sz);
 	pthread_cleanup_push(free, of_buf);
 	ssize_t rdc;
 	size_t rdsz = of_sz;
 	char* rdpt = of_buf;
+	off_t rd_off = 0;
 	do {
-		rdc = read(ofd, rdpt, rdsz);
+		rdc = pread(ofd, rdpt, rdsz, rd_off);
 		rdsz -= rdc;
 		rdpt += rdc;
-	} while (rdc != -1 && rdsz > 0);
+		rd_off += rdc;
+	} while (rdc > 0 && rdsz > 0);
 	if (rdc == -1) cleanup_thr(SRC_C_READ);
+	if (rdsz > 0) // early EOF
+		syslog(LOG_WARN, "Read fewer bytes from buffer than expected: %zu of %zu", of_sz - rdsz, of_sz);
 		
 	// send buffer contents to client
 	off64_t sploff = 0;
