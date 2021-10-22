@@ -238,7 +238,7 @@ static void* client_thread (void* param_v) {
 	} while (rdc > 0 && rdsz > 0);
 	if (rdc == -1) cleanup_thr(SRC_C_READ);
 	if (rdsz > 0) // early EOF
-		syslog(LOG_WARN, "Read fewer bytes from buffer than expected: %zu of %zu", of_sz - rdsz, of_sz);
+		syslog(LOG_WARNING, "Read fewer bytes from buffer than expected: %zu of %zu", of_sz - rdsz, of_sz);
 		
 	// send buffer contents to client
 	off64_t sploff = 0;
