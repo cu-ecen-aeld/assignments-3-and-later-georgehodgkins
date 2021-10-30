@@ -10,14 +10,19 @@
 
 #ifdef __KERNEL__
 #include <linux/string.h>
-#define assert(a)
+#include <linux/slab.h>
+#include <linux/uaccess.h>
+#include <asm/bug.h>
+#define free(x) kfree(x)
 #else
 #include <string.h>
-#define assert(a) assert(a)
+#include <stdlib.h>
+#include <assert.h>
+#define WARN_ON(a) assert(!(a))
 #endif
 
 #include "aesd-circular-buffer.h"
-#include "assert.h"
+
 
 #define AESDCHAR_BUFSZ AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED
 #define INCWRAP(x) \
@@ -35,7 +40,6 @@
  * @return the struct aesd_buffer_entry structure representing the position described by char_offset, or
  * NULL if this position is not available in the buffer (not enough data is written).
  */
-#include <stdio.h>
 struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
 			size_t char_offset, size_t *entry_offset_byte_rtn )
 {
@@ -44,7 +48,6 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 	size_t s_offs = 0; 
 	uint8_t i = buffer->out_offs;
 	do { // loop guard is false initially if buffer is full
-		assert(buffer->entry[i].buffptr);
 		size_t new_s = s_offs + buffer->entry[i].size;
 		if (new_s > char_offset) break;
 		else s_offs = new_s;
@@ -65,17 +68,21 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+const char* aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer,
+		const struct aesd_buffer_entry *add_entry)
 {
-	assert(add_entry->buffptr);
+	WARN_ON(add_entry->buffptr == NULL);
+	const char* rem = NULL;
 	if (buffer->full) {
-		assert(buffer->in_offs == buffer->out_offs);
+		WARN_ON(buffer->in_offs != buffer->out_offs);
+		rem = buffer->entry[buffer->out_offs].buffptr;
 		INCWRAP(buffer->out_offs);
 	}
 	
 	buffer->entry[buffer->in_offs] = *add_entry;
 	INCWRAP(buffer->in_offs);
 	buffer->full = (buffer->in_offs == buffer->out_offs);
+	return rem;
 }
 
 /**
@@ -85,3 +92,18 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
 {
     memset(buffer,0,sizeof(struct aesd_circular_buffer));
 }
+
+/*
+ * Empties @param buffer, freeing all strings it contains.
+ */
+void aesd_circular_buffer_free(struct aesd_circular_buffer *buffer) {
+	if (buffer->out_offs == buffer->in_offs && !buffer->full) return;
+
+	do {
+		free(buffer->entry[buffer->out_offs].buffptr);
+		buffer->entry[buffer->out_offs].buffptr = NULL;
+		INCWRAP(buffer->out_offs);
+	} while(buffer->out_offs != buffer->in_offs);
+}
+
+

@@ -32,20 +32,29 @@ struct node {
 // -----constants-----
 #define INITIAL_MAX_PACKET 1024
 #define MAX_BACKLOG 8
+
+#ifdef USE_AESD_CHAR_DEVICE
+const char* outpath = "/dev/aesdchar";
+#else
 const char* outpath = "/var/tmp/aesdsocketdata";
 #define MAX_TIMELEN 48
 #define WRTIME_PERIOD 10
+static char timestr[MAX_TIMELEN]; // static buffer for time string
+#endif
 
 // -----globals-----
 long PAGE_SIZE; // \_/()\_/
 int asock = -1; // accepting socket
 int ofd = -1; // output file descriptor
+size_t of_sz = 0;
+#ifndef USE_AESD_CHAR_DEVICE
 void* of_mem = NULL; // output file mapping
 size_t of_memsz = 0; // size of output file mapping
 char* of_pt = NULL; // output cursor
-size_t of_sz = 0;
+#else
+#define MAX_ALLOCA_BUF ((PTHREAD_STACK_MIN >> 2)*3) 
+#endif
 pthread_mutex_t of_lk = PTHREAD_MUTEX_INITIALIZER; // output file lock
-static char timestr[MAX_TIMELEN]; // static buffer for time string
 pthread_mutex_t ntoa_lk = PTHREAD_MUTEX_INITIALIZER; // lock for inet_ntoa (uses a static buffer)
 struct node* thread_ll = NULL; // linked list of active threads
 
@@ -56,7 +65,7 @@ typedef enum {SRC_SOCKET, SRC_LISTEN, SRC_INT = SIGINT, // this has to be locate
 	SRC_BIND, SRC_OPEN, SRC_MMAP, SRC_MREMAP, SRC_ACCEPT, SRC_SIGACTION,
 	SRC_MALLOC, SRC_REALLOC, SRC_FSTAT, SRC_CLOSE, SRC_READ, SRC_WRITE,
 	SRC_TERM = SIGTERM, SRC_FTRUNCATE, SRC_EINVAL, SRC_DUP,
-	SRC_PTHCR, SRC_PTHJN, SRC_STRFTIME, SRC_PTHATTR} cleanup_src;
+	SRC_PTHCR, SRC_PTHJN, SRC_STRFTIME, SRC_PTHATTR, SRC_C_WRITE, SRC_C_READ} cleanup_src;
 
 // error message table
 const char* errs[] = {
@@ -82,7 +91,9 @@ const char* errs[] = {
 	[SRC_PTHCR] = "error creating client thread",
 	[SRC_PTHJN] = "error joining client thread",
 	[SRC_STRFTIME] = "error formatting time",
-	[SRC_PTHATTR] = "error setting thread attributes"
+	[SRC_PTHATTR] = "error setting thread attributes",
+	[SRC_C_WRITE] = "error writing to circular buffer",
+	[SRC_C_READ] = "error reading from circular buffer"
 };
 
 // main cleanup handler
@@ -112,9 +123,11 @@ static void cleanup_errno (cleanup_src src, int e) {
 	   	free(n);
 	}	
 	if (asock != -1) close(asock);
-	if (of_mem) munmap(of_mem, of_memsz);
 	if (ofd != -1) close (ofd);
+#ifndef USE_AESD_CHAR_DEVICE
+	if (of_mem) munmap(of_mem, of_memsz);
 	unlink(outpath);
+#endif
 
 	exit(xstat);
 }
@@ -195,6 +208,52 @@ static void* client_thread (void* param_v) {
 		max_read -= read_sz;
 	}
 
+#ifdef USE_AESD_CHAR_DEVICE
+	// write packet to buffer
+	pthread_mutex_lock(&of_lk);
+	size_t wrsz = packet_sz;
+	char* wrpt = packet;
+	ssize_t wrc;
+	do {
+		wrc = write(ofd, wrpt, wrsz);
+		wrsz -= wrc;
+		wrpt += wrc;
+	} while (wrsz > 0 && wrc != -1);
+	if (wrc == -1) cleanup_thr(SRC_C_WRITE);
+	of_sz += packet_sz;
+	syslog(LOG_INFO, "Got packet of length %zu from client, new file length %zu", packet_sz, of_sz);
+	
+	// get buffer contents in userspace
+	char* of_buf = malloc(of_sz);
+	pthread_cleanup_push(free, of_buf);
+	ssize_t rdc;
+	size_t rdsz = of_sz;
+	char* rdpt = of_buf;
+	off_t rd_off = 0;
+	do {
+		rdc = pread(ofd, rdpt, rdsz, rd_off);
+		rdsz -= rdc;
+		rdpt += rdc;
+		rd_off += rdc;
+	} while (rdc > 0 && rdsz > 0);
+	if (rdc == -1) cleanup_thr(SRC_C_READ);
+	if (rdsz > 0) // early EOF
+		syslog(LOG_WARNING, "Read fewer bytes from buffer than expected: %zu of %zu", of_sz - rdsz, of_sz);
+		
+	// send buffer contents to client
+	off64_t sploff = 0;
+	wrsz = of_sz;
+	wrpt = of_buf;
+	do {
+		wrc = write(param->sock, wrpt, wrsz);
+		wrsz -= wrc;
+		wrpt += wrc;
+	} while (wrsz > 0 && wrc != -1);
+	if (wrc == -1) cleanup_thr(SRC_WRITE);
+	pthread_mutex_unlock(&of_lk);
+	syslog(LOG_INFO, "Sent full file back to client, length %zu", of_sz);
+	pthread_cleanup_pop(1); // frees of_buf
+#else 
 	// write packet
 	pthread_mutex_lock(&of_lk);
 	if (of_sz + packet_sz > of_memsz) { // need to expand mapping
@@ -222,10 +281,10 @@ static void* client_thread (void* param_v) {
 		wsz = write(param->sock, of_mem, write_sz);
 	} while (wsz != -1 && write_sz > wsz);
 	if (wsz == -1) cleanup_thr(SRC_WRITE);
+#endif
 
 	// close & cleanup connection
-	pthread_cleanup_pop(0);
-	free(packet);
+	pthread_cleanup_pop(1); // frees packet buffer
 	pthread_cleanup_pop(0);
 	s = close(param->sock);
 	if (s == -1) cleanup(SRC_CLOSE);
@@ -233,6 +292,7 @@ static void* client_thread (void* param_v) {
 	return NULL;
 }
 
+#ifndef USE_AESD_CHAR_DEVICE
 // periodic time logger (SIGALRM handler)
 static void wrtime (int sig) {
 	assert(sig == SIGALRM);
@@ -256,6 +316,7 @@ static void wrtime (int sig) {
 	pthread_mutex_unlock(&of_lk);
 	alarm(WRTIME_PERIOD);
 }
+#endif // USE_AESD_CHAR_DEVICE
 
 int main (int argc, char** argv) {
 	// open syslog
@@ -282,6 +343,7 @@ int main (int argc, char** argv) {
 	s = sigaction(SIGTERM, &act, NULL);
 	if (s == -1) cleanup(SRC_SIGACTION);
 
+#ifndef USE_AESD_CHAR_DEVICE
 	// open+mmap output file
 	PAGE_SIZE = sysconf(_SC_PAGESIZE);
 	ofd = open(outpath, O_RDWR | O_CREAT | O_APPEND, 0644);
@@ -295,6 +357,7 @@ int main (int argc, char** argv) {
 	of_mem = mmap(NULL, of_memsz, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
 	if (of_mem == MAP_FAILED) cleanup(SRC_MMAP);
 	of_pt = (char*) of_mem + of_sz;
+#endif
 
 	// create socket
 	asock = socket(AF_INET, SOCK_STREAM, 0);
@@ -336,6 +399,7 @@ int main (int argc, char** argv) {
 	s = listen(asock, MAX_BACKLOG);
 	if (s == -1) cleanup(SRC_LISTEN);
 
+#ifndef USE_AESD_CHAR_DEVICE
 	// install alarm handler and start alarm (must be after fork)
 	act.sa_sigaction = NULL; // in case it's a union
 	act.sa_handler = wrtime;
@@ -343,6 +407,7 @@ int main (int argc, char** argv) {
 	s = sigaction(SIGALRM, &act, NULL);
 	if (s == -1) cleanup(SRC_SIGACTION);
 	alarm(WRTIME_PERIOD);
+#endif
 
 	// this thread handles all signals
 	/* only in glibc >= 2.32 though :(
@@ -364,6 +429,11 @@ int main (int argc, char** argv) {
 		} while (csock == -1 && errno == EINTR);
 		if (csock == -1) cleanup(SRC_ACCEPT);
 		assert(addrlen <= sizeof(struct sockaddr_in));
+
+		if (ofd == -1) {
+			ofd = open(outpath, O_RDWR);
+			if (ofd == -1) cleanup(SRC_OPEN);
+		}
 
 		// give connection to thread
 		struct node* newnode = malloc(sizeof(struct node));		
